@@ -2335,13 +2335,32 @@ var CATL2={lane:'라인전',gank:'갱킹',grubs:'공허 유충',dragon:'용',sou
 var RISKL=['🟢 안정','🟡 보통','🔴 고위험'];
 var LK={lane:.8,gank:.9,grubs:.7,dragon:1,soul:1.4,herald:1,baron:1.8,elder:1.8,fight:1.5,siege:1,split:1,comm:.6};
 var OBJL={dragon:'🐉 용',grubs:'🪱 공허 유충',herald:'👁️ 전령',baron:'👑 바론',elder:'🔥 장로 용'};
+
+/* ============ 경기 양상(매 경기 다른 흐름) · 조기 종료 ============ */
+var ARCH={
+ normal:{n:'정석 운영전',d:'라인과 오브젝트가 고르게 이어지는 경기',T:0,E:0,kill:1,tower:1,fight:1},
+ stomp:{n:'초반 압박전',d:'초반 주도권이 그대로 굴러가는 경기',T:-8,E:0,kill:1.7,tower:1.5,fight:.9,snow:true},
+ scaling:{n:'후반 운영전',d:'킬은 적고 오브젝트와 한타가 승부를 가르는 경기',T:4,E:1,kill:.55,tower:.8,fight:.7},
+ skirmish:{n:'난전',d:'교전이 잦고 킬이 많이 나오는 경기',T:-1,E:0,kill:1.9,tower:.9,fight:2.3,fx:'fight'},
+ siege:{n:'공성·사이드 운영전',d:'타워 압박과 사이드 운영이 중심인 경기',T:1,E:0,kill:.8,tower:1.8,fight:.7,fx:'siege'},
+ swing:{n:'롤러코스터',d:'흐름이 여러 번 뒤집히는 경기',T:2,E:0,kill:1.2,tower:1,fight:1.3,swing:true}
+};
+function pickArch(){
+  var D=M.D,c=function(x,k){return (D[x].t[k]||0);};
+  var e=c('cU','R')+c('cO','R'),s=c('cU','S')+c('cO','S'),en=c('cU','E')+c('cO','E'),k=c('cU','K')+c('cO','K'),p=c('cU','P')+c('cO','P');
+  var w={normal:1.3,stomp:1+e*.18,scaling:1+s*.18,skirmish:1+en*.15+k*.1,siege:1+p*.2,swing:.9},tot=0,key;
+  for(key in w)tot+=w[key];
+  var x=Math.random()*tot;
+  for(key in w){x-=w[key];if(x<=0)return key;}
+  return 'normal';
+}
 function lvState(){return {t:0,drk:{us:0,opp:0},soul:null,drkNext:5,elderNext:null,grubs:false,herald:false,bNext:20,tc:{us:{top:0,mid:0,bot:0},opp:{top:0,mid:0,bot:0}},tm:{us:{top:-9,mid:-9,bot:-9},opp:{top:-9,mid:-9,bot:-9}}};}
 function lvPus(bias){return bias?(bias==='us'?.8:.2):cl(.5+M.L*.05,.12,.88);}
 function lvPush(b){var R=RPS;R.q.push(b);R.q.sort(function(a,c){return a.m-c.m;});}
 function lvKill(side,t,o){lvPush(mkKill(side,t,o));}
 function lvTower(side,t,lane){
   var S=RPS.S,def=side==='us'?'opp':'us',lanes=['top','mid','bot'];
-  var cand=lanes.filter(function(l){var tier=S.tc[def][l]+1;return tier<=3&&t>=[9,13,17][tier-1]&&t-S.tm[def][l]>=2;});
+  var cand=lanes.filter(function(l){var tier=S.tc[def][l]+1;return tier<=3&&t>=[8,11,14][tier-1]&&t-S.tm[def][l]>=2;});
   if(lane&&cand.indexOf(lane)>=0)cand=[lane];
   if(!cand.length)return false;
   var l=pick(cand),tier=S.tc[def][l]+1;
@@ -2370,7 +2389,7 @@ function lvObj(kind,side,t){
 }
 function lvAvail(S,t){return {dragon:!S.soul&&t>=S.drkNext,elder:S.soul!==null&&S.elderNext!==null&&t>=S.elderNext,grubs:!S.grubs&&t>=8&&t<=14.5,herald:!S.herald&&t>=15&&t<=19.5,baron:t>=S.bNext};}
 function lvBg(toMin,bias){
-  var R=RPS,S=R.S,pus=lvPus(bias),m,k;
+  var R=RPS,S=R.S,pus=lvPus(bias),m,k,A=R.A||ARCH.normal;
   function sd(){return Math.random()<pus?'us':'opp';}
   function oth(x){return x==='us'?'opp':'us';}
   for(m=Math.floor(S.t)+1;m<=toMin;m++){
@@ -2380,9 +2399,9 @@ function lvBg(toMin,bias){
     if(!S.grubs&&m>=14){lvObj('grubs',sd(),14.1+rnd(0,.5));}
     if(!S.herald&&m>=19){lvObj('herald',sd(),19+rnd(0,.5));}
     if(av.baron&&m>=S.bNext+5&&m>=25){lvObj('baron',sd(),Math.max(m,S.bNext)+rnd(0,.5));}
-    if(m>=3&&Math.random()<.35){s=sd();lvKill(s,tt());}
-    if(m>=9&&Math.random()<.22)lvTower(sd(),tt());
-    if(m>=12&&Math.random()<.08){s=sd();var t0=tt(),nf=ri(2,3);lvPush({m:t0,kind:'fight',side:s});for(k=0;k<nf;k++)lvKill(Math.random()<.72?s:oth(s),t0+.05*(k+1),{fight:true});}
+    if(m>=3&&Math.random()<.35*A.kill){s=sd();lvKill(s,tt());}
+    if(m>=8&&Math.random()<.22*A.tower)lvTower(sd(),tt());
+    if(m>=12&&Math.random()<.08*A.fight){s=sd();var t0=tt(),nf=ri(2,3);lvPush({m:t0,kind:'fight',side:s});for(k=0;k<nf;k++)lvKill(Math.random()<.72?s:oth(s),t0+.05*(k+1),{fight:true});}
   }
   S.t=Math.max(S.t,toMin);
 }
@@ -2395,6 +2414,11 @@ function lvPlan(){
   if(!S.herald)cands.push({t:Math.max(15+rnd(0,3),c+2.5),w:4.5,tpl:'herald'});
   cands.push({t:Math.max(S.bNext+rnd(1,5),c+2.5),w:5,tpl:'baron'});
   cands.push({t:c+rnd(3,6),w:2.5,tpl:'filler'});
+  var A=R.A||ARCH.normal;
+  if(A.fx==='fight'&&c>=6)cands.push({t:c+rnd(2.5,5),w:4,tpl:'fight'});
+  if(A.fx==='siege'&&c>=9){cands.push({t:c+rnd(2.5,5),w:3.5,tpl:'siege'});cands.push({t:c+rnd(3,6),w:3,tpl:'split'});}
+  if(A.swing&&c>=7)cands.push({t:c+rnd(2.5,5),w:3,tpl:'fight'});
+  if(A.snow&&c<9)cands.push({t:c+rnd(1.5,3.5),w:4,tpl:'gank'});
   cands=cands.filter(function(x){return x.t<=lim&&(x.tpl!=='grubs'||x.t<=14.4)&&(x.tpl!=='herald'||x.t<=19.4);});
   if(R.nev===R.E-1&&!R.baronEv&&R.T0>=26){var f=cands.filter(function(x){return x.tpl==='baron'||x.tpl==='elder';});if(f.length)cands=f;}
   if(!cands.length)return null;
@@ -2405,6 +2429,10 @@ function lvPlan(){
 }
 function lvSchedule(){
   var R=RPS;
+  if(R.nev>=2&&!R.earlyEnd&&R.last>=11){
+    var lead=R.gv+.2*M.L*gscale(R.last),nrm=Math.abs(lead)/gscale(R.last);
+    if(nrm>=.9&&Math.random()<cl((nrm-.9)/.9,0,1)*.85){R.earlyEnd=lead>0?'us':'opp';lvFinalize();return;}
+  }
   if(R.nev<R.E){var p=lvPlan();if(p){R.mt=p.t;R.hint=p.tpl;lvBg(p.t);return;}}
   lvFinalize();
 }
@@ -2413,7 +2441,7 @@ function lvSiege(ws){
   var R=RPS,S=R.S,def=ws==='us'?'opp':'us',lanes=['top','mid','bot'],best=lanes[0],T=R.T;
   lanes.forEach(function(l){if(S.tc[def][l]>S.tc[def][best]||(S.tc[def][l]===S.tc[def][best]&&Math.random()<.5))best=l;});
   while(S.tc[def][best]<3){
-    var tier=S.tc[def][best]+1,t=Math.max([9,13,17][tier-1]+rnd(0,1.5),S.tm[def][best]+2.05);
+    var tier=S.tc[def][best]+1,t=Math.max([8,11,14][tier-1]+rnd(0,1.5),S.tm[def][best]+2.05);
     if(t>T-.4)T=Math.ceil(t+.6);
     S.tc[def][best]=tier;S.tm[def][best]=t;
     lvPush({m:t,kind:'tower',side:ws,def:def,lane:best,tier:tier});
@@ -2422,7 +2450,11 @@ function lvSiege(ws){
 }
 function lvFinalize(){
   var R=RPS,g=computeGame();R.g=g;
-  R.T=Math.round(Math.max(R.T0-Math.abs(M.L)*.5+ri(-2,2),R.last+ri(2,5),21));
+  if(R.earlyEnd){g.win=(R.earlyEnd==='us');R.T=Math.round(Math.max(R.last+ri(2,4),15));}
+  else{
+    var floor=21-Math.min(5,Math.max(0,Math.abs(M.L)-3.5));
+    R.T=Math.round(Math.max(R.T0-Math.abs(M.L)*.5+ri(-2,2),R.last+ri(2,5),floor));
+  }
   lvBg(R.T-1,g.win?'us':'opp');
   lvSiege(g.win?'us':'opp');
   lvPush({m:R.T,kind:'nexus',side:g.win?'us':'opp'});
@@ -2510,6 +2542,7 @@ function lvPickTpl(hint,t){
   if(hint==='herald'&&av.herald)return 'herald';
   if(hint==='baron'&&av.baron)return 'baron';
   if(hint==='early')return G.role==='jg'?'jginv':pick(['lane','lane','gank']);
+  if(hint==='fight'&&t>=8)return 'fight';if(hint==='siege'&&t>=11)return 'siege';if(hint==='split'&&t>=14)return 'split';if(hint==='gank'&&t<=14&&G.role!=='jg')return 'gank';
   var f=[];
   if(av.baron)f.push('baron');if(av.dragon)f.push('dragon');if(av.elder)f.push('elder');if(av.grubs)f.push('grubs');if(av.herald)f.push('herald');
   if(hint!=='filler'&&f.length)return pick(f);
@@ -2595,6 +2628,10 @@ function lvApply(spec,i){
   R.nev++;R.last=t;R.used.push(spec.tpl);
   R.pts.push([t,M.L]);
   var lines=lvTeam(spec,op,ok),st=lvTrack(spec,op,ok);
+  if(R.A&&R.A.swing&&R.nev>=2&&R.nev<R.E+1&&Math.random()<.35){
+    var sh=(M.L>0?-1:1)*rnd(1,2.2);M.L+=sh;R.pts.push([t+.01,M.L]);
+    st.push('🌪️ 흐름이 요동쳐요 — '+(sh>0?'우리':'상대')+' 쪽으로 기울었어요');
+  }
   var arr=RTX[spec.kind][ok?0:1],txt=fillTxt(pick(arr));
   var html='<p>'+(ok?'✅ ':'⚠️ ')+esc(txt)+'</p>'
     +(hl?'<p style="color:#ffd24a;font-weight:700;margin:6px 0">⭐ '+esc(hl.txt)+'</p>':'')
@@ -2757,7 +2794,7 @@ function lvSummary(win,mins,endV){
   var R=RPS,pts=R.pts||[],minL=0,maxL=0,i;
   pts.forEach(function(p){minL=Math.min(minL,p[1]);maxL=Math.max(maxL,p[1]);});
   var type=win?(minL<=-2.5?'comeback':(minL>-1&&maxL>=4?'stomp':Math.abs(endV)<1.2?'close':'normal')):(maxL>=2.5?'throwL':Math.abs(endV)<1.2?'closeL':'normalL');
-  var h='<p style="margin:6px 0;font-weight:700">'+esc(pick(HEADT[type]))+'</p>';
+  var h=(R.A?'<p class="sm" style="margin:2px 0">🎬 경기 양상: <b>'+esc(R.A.n)+'</b> — '+esc(R.A.d)+(R.earlyEnd?' · 일찍 승부가 갈렸어요':'')+'</p>':'')+'<p style="margin:6px 0;font-weight:700">'+esc(pick(HEADT[type]))+'</p>';
   // MVP
   var sc={top:0,jg:0,mid:0,adc:0,sup:0},wk=win;
   M.evlog.forEach(function(x){
@@ -2812,7 +2849,8 @@ function lvStart(vis){
   M.view='main';
   initEvents();
   var D=M.D,tempo=(D.cU.t.S+D.cO.t.S)-(D.cU.t.R+D.cO.t.R);
-  var T0=Math.round(cl(31+tempo*1.1+gauss()*1.5,23,42)),E=T0<27?3:T0<33?4:5;
+  var ak=pickArch(),A=ARCH[ak];
+  var T0=Math.round(cl(31+tempo*1.1+gauss()*3.2+A.T,17,46)),E=cl((T0<26?3:T0<32?4:5)+(A.E||0),3,6);
   var info={dots:[]};
   ['us','opp'].forEach(function(sd){
     var col=((sd==='us')===(M.ourSide==='b'))?'b':'r',mp=sd==='us'?D.us:D.opp;
@@ -2821,11 +2859,13 @@ function lvStart(vis){
   RPS={speed:OPT.speed||1,clock:0,paused:false,busy:false,q:[],info:info,kills:{us:0,opp:0},feed:[],fin:false,T:null,g:null,vis:vis,auto:M.mode!=='full',
     usCol:M.ourSide==='b'?'b':'r',timer:null,gv:0,endL:0,dt:{us:[],opp:[]},tw:{us:0,opp:0},gr:{us:0,opp:0},bar:{us:0,opp:0},hd:{us:0,opp:0},soul:null,bn:null,eb:null,pts:[[0,M.L0||0]],
     S:lvState(),T0:T0,E:E,nev:0,last:0,mt:null,hint:null,used:[],cur:null,baronEv:false,
-    fx:{lane:0,press:0,vis:0},mom:0,hr:{n:0,ok:0,fail:0,safe:0},hl:[],sy:{follow:0,ignore:0},kda:kdaInit(),fb:null,mk:{},mvp:null};
+    fx:{lane:0,press:0,vis:0},mom:0,hr:{n:0,ok:0,fail:0,safe:0},hl:[],sy:{follow:0,ignore:0},kda:kdaInit(),fb:null,mk:{},mvp:null,arch:ak,A:A,earlyEnd:null};
+  if(A.snow){var sg=(M.L0||0)>=0?1:-1;if(Math.abs(M.L0||0)<.8)sg=Math.random()<.5?1:-1;M.L+=sg*rnd(2,4);}
   lvSchedule();
   if(vis){
     showSheet('','<div id="rpbox">'+rpHeader()+rpHTML(info)+'</div>',[]);
     rpHud();
+    rpFeed('🎬 이번 경기는 '+A.n+' 양상이에요. '+A.d);
     RPS.timer=setInterval(rpTick,150);
   }else lvSheetStep();
 }
